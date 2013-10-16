@@ -1,12 +1,13 @@
 class RotaryWheel < UIControl
 
+  TEKST = %w{foo bar pub caffee whatever}
+
   attr_accessor :delegate, :number_of_sections, :delta_angle, :container, :start_transform, :sectors, :current_sector
 
   def initWithFrame(frame, withDelegate: del, withSections: sections_number)
-
     if super
       self.number_of_sections = sections_number
-      self.delegate           = self
+      self.delegate           = del
       self.draw_wheel
     end
 
@@ -20,7 +21,7 @@ class RotaryWheel < UIControl
     self.number_of_sections.times.each do |i|
       im                   = UILabel.alloc.initWithFrame(CGRectMake(0, 0, 100, 40))
       im.backgroundColor   = UIColor.redColor
-      im.text              = i.to_s
+      im.text              = TEKST[i]
       im.layer.anchorPoint = CGPointMake(1.0, 0.5);
       im.layer.position    = CGPointMake(self.container.bounds.size.width/2.0, self.container.bounds.size.height/2.0)
       im.transform         = CGAffineTransformMakeRotation(angle_size * i)
@@ -37,6 +38,14 @@ class RotaryWheel < UIControl
     else
       build_sectors_odd
     end
+
+    self.current_sector = sectors[0]
+    self.delegate.wheelDidChangeValue self.current_sector 
+  end
+
+  def rotate(userInfo)
+    self.start_transform ||= self.container.transform
+    self.container.transform = CGAffineTransformRotate(self.start_transform, 1)
   end
 
   def build_sectors_odd
@@ -49,6 +58,7 @@ class RotaryWheel < UIControl
       sector.min_value = mid - (fan_width / 2)
       sector.max_value = mid + (fan_width / 2)
       sector.sector    = i
+      sector.label     = TEKST[i]
       mid              -= fan_width
 
       if (sector.min_value < - Math::PI)
@@ -57,7 +67,7 @@ class RotaryWheel < UIControl
       end
 
       self.sectors << sector
-      NSLog("cl is #{sector.inspect}")
+      NSLog("cl is #{sector}")
     end
   end
 
@@ -71,6 +81,7 @@ class RotaryWheel < UIControl
       sector.min_value = mid - (fan_width / 2)
       sector.max_value = mid + (fan_width / 2)
       sector.sector    = i
+      sector.label     = TEKST[i]
 
       if sector.max_value - fan_width < -Math::PI
         mid = Math::PI
@@ -80,8 +91,12 @@ class RotaryWheel < UIControl
       mid -= fan_width
 
       self.sectors << sector
-      NSLog("cl is #{sector.inspect}")
+      NSLog("cl is #{sector}")
     end
+  end
+
+  def rad2deg radians
+    radians * 180 / Math::PI
   end
 
   def beginTrackingWithTouch(touch, withEvent: event)
@@ -95,6 +110,7 @@ class RotaryWheel < UIControl
     dx                   = touch_point.x - self.container.center.x
     dy                   = touch_point.y - self.container.center.y
     self.delta_angle     = Math.atan2(dy, dx)
+    NSLog("start tracking #{rad2deg(self.delta_angle).to_i}")
     self.start_transform = self.container.transform
     true
   end
@@ -115,6 +131,8 @@ class RotaryWheel < UIControl
     dy                       = pt.y - self.container.center.y
     ang                      = Math.atan2(dy,dx)
     angle_difference         = self.delta_angle - ang
+    NSLog("cont. tracking #{rad2deg(angle_difference).to_i}")
+
     self.container.transform = CGAffineTransformRotate(self.start_transform, -angle_difference)
     true
   end
@@ -131,16 +149,18 @@ class RotaryWheel < UIControl
           else
             new_val = Math::PI + radians
           end
-          current_sector = s.sector
+          self.current_sector = s
         end
       elsif radians > s.min_value && radians < s.max_value
         new_val        = radians - s.mid_value
-        current_sector = s.sector
+        self.current_sector = s
       end
     end
 
+    self.delegate.wheelDidChangeValue self.current_sector 
+
     UIView.beginAnimations(nil, context: nil)
-    UIView.setAnimationDuration(0.2)
+    UIView.setAnimationDuration(0.4)
     t = CGAffineTransformRotate(self.container.transform, -new_val)
     self.container.transform = t
     UIView.commitAnimations
